@@ -21,12 +21,14 @@ Create a meta repository as the developer workspace root. It holds documentation
 
 ```
 <meta-repo>/
-├── .gitignore           # ignores packages/
+├── .gitignore           # ignores packages/ and .claude/
 ├── CLAUDE.md            # top-level Claude Code context
 ├── architecture.md      # how the repos relate and interact
 ├── docs/
 │   ├── runbooks/        # operational procedures
 │   └── decisions/       # architecture decision records (ADRs)
+├── hooks/
+│   └── pre-commit       # optional hook source — install via setup.sh
 ├── scripts/
 │   └── setup.sh         # clones source repos into packages/
 └── packages/            # gitignored — each subdir is its own repo
@@ -52,7 +54,7 @@ Create a meta repository as the developer workspace root. It holds documentation
 
 | File | Purpose |
 |------|---------|
-| `.gitignore` | Ignores the `packages/` directory |
+| `.gitignore` | Ignores the `packages/` directory and `.claude/` (local Claude Code settings) |
 | `scripts/setup.sh` | Clones source repos into `packages/` — edit URLs to match your project |
 | `CLAUDE.md` | Starter Claude Code context file — fill in repo table and workflow details |
 | `architecture.md` | Starter architecture doc — describe data flow and repo responsibilities |
