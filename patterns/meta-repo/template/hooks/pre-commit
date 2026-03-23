@@ -1,0 +1,9 @@
+#!/bin/bash
+# Copy this file to .git/hooks/pre-commit and make it executable:
+#   cp hooks/pre-commit .git/hooks/pre-commit
+#   chmod +x .git/hooks/pre-commit
+
+if git diff --cached --name-only | grep -q '^packages/'; then
+  echo "Error: Staged files found under packages/ — this directory is gitignored by convention."
+  exit 1
+fi
