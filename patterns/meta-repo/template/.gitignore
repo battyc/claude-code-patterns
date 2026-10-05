@@ -1,2 +1,5 @@
+# Source repos, cloned in by scripts/setup.sh
 packages/
-.claude/
+
+# Personal Claude Code settings. Shared commands and settings in .claude/ are committed.
+.claude/settings.local.json
