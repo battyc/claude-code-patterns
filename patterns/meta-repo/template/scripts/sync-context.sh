@@ -14,8 +14,13 @@ check=false
 if [ "${1:-}" = "--check" ]; then check=true; shift; fi
 packages="$(packages_dir "${1:-}")"
 
+for source in context/system-map.md context/session-start.sh; do
+  if [ ! -f "$META_DIR/$source" ]; then echo "error: $META_DIR/$source is missing" >&2; exit 2; fi
+done
+
 START="<!-- system-map:start: synced from $META_NAME/context/system-map.md by scripts/sync-context.sh; edit it there -->"
 tmp="$(mktemp)"
+chmod 644 "$tmp"   # mktemp makes it 0600, which a new file copied from it would keep
 trap 'rm -f "$tmp"' EXIT
 changed=0
 
@@ -42,6 +47,7 @@ for name in $(repo_names); do
 
   cp "$META_DIR/context/session-start.sh" "$tmp"
   put "$dir/.claude/hooks/session-start.sh"
+  if ! $check; then chmod +x "$dir/.claude/hooks/session-start.sh"; fi
 done
 
 if [ "$changed" = 0 ]; then echo "in sync"; fi

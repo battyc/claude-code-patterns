@@ -20,12 +20,12 @@ else
 fi
 
 problems=()
-for dir in "$META_DIR" $(repo_names | sed "s|^|$packages/|"); do
-  name="$(basename "$dir")"
+check_repo() {
+  local name=$1 dir=$2 gate
   if ! is_cloned "$dir"; then
     gate="$(repo_gate "$name")"
     problems+=("$name is missing${gate:+ (optional; setup.sh clones it with $gate=true)}: clone it into $dir")
-    continue
+    return
   fi
   if [ "$(git -C "$dir" rev-parse --is-shallow-repository)" = true ]; then
     problems+=("$name is a shallow clone: run \`git -C $dir fetch --unshallow\` before reasoning from its history")
@@ -34,11 +34,19 @@ for dir in "$META_DIR" $(repo_names | sed "s|^|$packages/|"); do
   if { [ -z "$package_dir" ] || [ "$dir" = "$package_dir" ]; } && [ -f "$dir/package.json" ] && [ ! -d "$dir/node_modules" ]; then
     problems+=("$name has no node_modules: run \`npm ci\` in $dir before building or testing")
   fi
-done
+}
 
-stale="$(bash "$META_DIR/scripts/sync-context.sh" --check "$packages" 2>&1 | grep -E '^(stale|error):' | sed "s|$packages/||")"
+check_repo "$META_NAME" "$META_DIR"
+while read -r name; do
+  check_repo "$name" "$packages/$name"
+done < <(repo_names)
+
+stale=""
+while read -r line; do
+  stale="${stale:+$stale; }${line//"$packages/"/}"
+done < <(bash "$META_DIR/scripts/sync-context.sh" --check "$packages" 2>&1 | grep -E '^(stale|error):')
 if [ -n "$stale" ]; then
-  problems+=("the synced context is stale, so a system map or session-start hook may be out of date: run \`bash $META_DIR/scripts/sync-context.sh $packages\` and commit the result in each package. $(echo "$stale" | paste -sd ';' -)")
+  problems+=("the synced context is stale, so a system map or session-start hook may be out of date: run \`bash \"$META_DIR/scripts/sync-context.sh\" \"$packages\"\` and commit the result in each package. $stale")
 fi
 
 echo "Workspace: $packages."
