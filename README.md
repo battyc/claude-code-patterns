@@ -6,7 +6,8 @@ A collection of reusable project patterns for working effectively with Claude Co
 
 | Pattern | Description |
 |---------|-------------|
-| [Meta Repo](patterns/meta-repo/README.md) | Use a wrapper repo as the workspace root to give Claude Code full context across multiple independent source repos. |
+| [Meta Repo](patterns/meta-repo/README.md) | A repo that holds what spans several source repos, syncs a short system map into each, and checks the workspace at the start of every session. |
+| [Provider-Owned Contracts](patterns/provider-owned-contracts/README.md) | Write each interface between repos down once, in the repo that provides it; consumers read it in place, and whoever changes it checks them. |
 
 ## Usage
 

@@ -1,0 +1,6 @@
+# The repos that make up the workspace, one per line: the directory name, the clone URL, and
+# optionally a variable that must be "true" for scripts/setup.sh to clone it (for a repo only some
+# people can access). scripts/setup.sh, check-workspace.sh and sync-context.sh all read this file.
+repo-1 git@github.com:org/repo-1.git
+repo-2 git@github.com:org/repo-2.git
+repo-3 git@github.com:org/repo-3.git INCLUDE_CONTENT

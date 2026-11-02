@@ -1,23 +1,18 @@
 #!/bin/bash
-set -e
-cd "$(dirname "$0")/.."
-mkdir -p packages
+# Clones the repos in repos.txt into packages/, skipping any already cloned. A repo with a gate
+# variable is cloned only when that variable is "true", e.g. INCLUDE_CONTENT=true scripts/setup.sh
+set -euo pipefail
+source "$(dirname "$0")/lib.sh"
+mkdir -p "$META_DIR/packages"
 
-clone() {
-  if [ -d "packages/$2" ]; then
-    echo "Skipping $2: already cloned"
+while read -r name url gate; do
+  if is_cloned "$META_DIR/packages/$name"; then
+    echo "Skipping $name: already cloned"
+  elif [ -n "$gate" ] && [ "${!gate:-false}" != "true" ]; then
+    echo "Skipping $name: set $gate=true to clone it"
   else
-    git clone "$1" "packages/$2"
+    git clone "$url" "$META_DIR/packages/$name"
   fi
-}
-
-# Clone source repos — edit URLs and directory names to match your project
-clone git@github.com:org/repo-1.git repo-1
-clone git@github.com:org/repo-2.git repo-2
-
-# Optional: a repo only some people have access to
-if [ "${INCLUDE_CONTENT:-false}" = "true" ]; then
-  clone git@github.com:org/repo-3.git repo-3
-fi
+done < <(repo_lines)
 
 echo "Done. Run 'cd packages/<repo>' to start working."

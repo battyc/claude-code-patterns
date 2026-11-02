@@ -1,0 +1,4 @@
+Add these to each repo's `AGENTS.md`, or to a section every repo shares, such as a meta repo's system map:
+
+- Where two repos meet, the provider writes the agreement down in its own `docs/contracts/` and names the consumers in its front matter; `docs/contracts/README.md` lists what this repo provides and what it depends on. Read a contract where its provider keeps it, in the sibling checkout, fetched to the latest `main`. What this repo relies on from systems outside the project is in its `docs/contracts/external/`.
+- Contracts change at the provider first. Changing one you provide: check each repo in its `consumers` against the change in the same piece of work, and change any that no longer holds. Relying on something from another repo: read its contract first, and if what you need isn't in it, change the provider before the consumer.
