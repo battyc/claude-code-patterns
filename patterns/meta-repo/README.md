@@ -1,85 +1,111 @@
 # Meta Repo
 
-Use a wrapper repo as the workspace root to give Claude Code full context across multiple independent source repos.
+A repo that holds what spans several source repos, and is the single source of what each of them needs to know about the others.
 
 ## Problem
 
-When a project spans multiple repositories with separate permissions and Git histories, Claude Code has no single root directory with full context. Opening one repo at a time means Claude can't see how the pieces fit together, leading to incomplete suggestions and missed cross-repo dependencies.
+When a project spans several repositories, some knowledge belongs to none of them: decisions that affect more than one repo, runbooks for operations that touch several, a plan across all of them, and the list of repos itself. Left in whichever repo happens to be nearest, it's out of sight of anyone working in the others.
+
+The repos also need to know about each other. An agent working in one repo, often with only that repo open, can't see how it depends on the rest: it suggests a change to how the DNS zone is referenced without seeing how the zone is defined. Copying a description of the system into every repo by hand works until the copies disagree.
+
+Opening every repo at once isn't the answer by itself: a cloud session already clones the repos side by side, and Claude Code can add sibling directories to a session. What's missing is a place for the shared knowledge, and a way for each repo to carry it.
 
 ## Solution
 
-Create a meta repository as the developer workspace root. It holds what spans the repos: how they relate, architecture notes, decision records, runbooks and setup tooling. The source repos are cloned into a gitignored `packages/` directory, each keeping its own independent Git history and remote. Claude Code is opened at the meta repo root and can read across all of `packages/` to understand the full system.
+Create a meta repo. It holds no application code. It owns:
 
-Guidance about one repo lives in that repo, not in the meta repo:
+- **What spans the repos**: `architecture.md`, decisions that affect more than one repo, runbooks, and `repos.txt`, the list of repos that make up the workspace.
+- **A system map** (`context/system-map.md`): a short description of every repo, how a change reaches production, and how to set up the workspace. `scripts/sync-context.sh` copies it into a marked block in each package's `AGENTS.md`, so a session opened in any one repo knows the rest. `--check` reports a copy that's out of date.
+- **A session-start check** (`scripts/check-workspace.sh`): reports a missing repo, a shallow clone (whose history would mislead), missing dependencies and a stale sync, each with the command that fixes it. It never blocks the session. The sync copies `context/session-start.sh` into each package as its Claude Code `SessionStart` hook, which finds the meta repo and runs the check.
 
-- Each package keeps its real instructions in `AGENTS.md`, with a one-line `CLAUDE.md` that imports it (`@AGENTS.md`). Other coding agents read `AGENTS.md`; Claude Code reads the shim.
-- The meta repo's `CLAUDE.md` describes only the cross-repo picture, then imports each package's `CLAUDE.md` (`@packages/<repo>/CLAUDE.md`).
+Guidance about one repo lives in that repo. Each package keeps its instructions in `AGENTS.md`, which other coding agents read natively, with a one-line `CLAUDE.md` that imports it (`@AGENTS.md`). The meta repo's `CLAUDE.md` imports the system map and each package's `CLAUDE.md`, so opening the meta repo loads the whole chain, and opening one package still loads that package's guidance.
 
-Opening the meta repo loads the whole chain. Opening a single package, or a workspace where the repos are cloned side by side without the meta repo's `packages/` layout, still loads that package's own guidance, so nothing about a package depends on the meta repo being present.
+The workspace has two layouts, and the scripts find either:
 
-Commands and settings shared by everyone go in the meta repo's `.claude/` directory and are committed. Only `.claude/settings.local.json`, which holds personal settings, is ignored.
+| Layout | Repos at | Made by |
+|---|---|---|
+| Inside | `<meta-repo>/packages/<repo>` (gitignored) | `scripts/setup.sh` |
+| Beside | `<dir>/<repo>`, next to `<dir>/<meta-repo>` | Cloning each repo into one directory, as cloud sessions do |
+
+The system map is the only thing synced. Where the repos meet in a defined interface, write it down with the [provider-owned contracts](../provider-owned-contracts/README.md) pattern: each repo keeps its own, and the others read them in place.
 
 ## When to Use
 
-- Project spans 2+ repos developed together
-- Different repos have different permission models
-- You want Claude Code to understand the full system from a single root
-- You want to version docs and architecture decisions without coupling them to source repos
+- The project spans 2+ repos developed together, with enough that belongs to no one repo to need a home
+- Sessions often have one repo open, and need to know what the others do
+- Different repos have different permission models, so a monorepo isn't an option
+
+If there's little cross-cutting to write down and sessions usually have every repo open, a parent directory (or `--add-dir`) and one repo that owns the shared notes is enough.
 
 ## Directory Structure
 
 ```
 <meta-repo>/
-├── .gitignore           # ignores packages/ and .claude/settings.local.json
 ├── .claude/
-│   └── commands/        # shared slash commands, committed
-├── CLAUDE.md            # cross-repo context, then imports each package's CLAUDE.md
-├── architecture.md      # how the repos relate and interact
+│   ├── settings.json      # runs the workspace check at session start
+│   └── commands/          # shared slash commands, committed
+├── .gitignore             # ignores packages/ and .claude/settings.local.json
+├── CLAUDE.md              # imports the system map, then each package's CLAUDE.md
+├── architecture.md        # how the repos relate and interact
+├── repos.txt              # the repos in the workspace, read by every script
+├── context/
+│   ├── system-map.md      # synced into each package's AGENTS.md
+│   └── session-start.sh   # synced into each package's .claude/hooks/
 ├── docs/
-│   ├── runbooks/        # operational procedures
-│   └── decisions/       # architecture decision records (ADRs)
+│   ├── runbooks/          # operations that touch more than one repo
+│   └── decisions/         # decisions that span repos
 ├── hooks/
-│   └── pre-commit       # optional hook source — install it by hand
+│   └── pre-commit         # refuses a commit that stages packages/
 ├── scripts/
-│   └── setup.sh         # clones source repos into packages/
-└── packages/            # gitignored — each subdir is its own repo
-    ├── <repo-1>/
-    │   ├── AGENTS.md    # the package's real instructions
-    │   └── CLAUDE.md    # one line: @AGENTS.md
-    ├── <repo-2>/
-    └── <repo-3>/
+│   ├── setup.sh           # clones repos.txt into packages/
+│   ├── sync-context.sh    # the system map and hook into each package; --check
+│   ├── check-workspace.sh # what's missing or stale, with the fix
+│   └── lib.sh             # finds the workspace in either layout
+└── packages/              # gitignored; or the repos sit beside the meta repo
+    └── <repo>/
+        ├── AGENTS.md      # the repo's instructions, with the system-map markers
+        ├── CLAUDE.md      # one line: @AGENTS.md
+        └── .claude/
+            ├── settings.json            # runs the hook at session start
+            └── hooks/session-start.sh   # synced from the meta repo
 ```
 
 ## Setup
 
-1. Create your meta repo and clone it locally
-2. Copy the files from `template/` into the repo root
-3. Edit `scripts/setup.sh` with your actual repo URLs, and run it. It skips repos already cloned, so it's safe to run again after adding one.
-4. Write your `CLAUDE.md` describing how the repos relate, and list each package's `CLAUDE.md` under "Instructions per package"
-5. In each package, put its instructions in `AGENTS.md` and add a `CLAUDE.md` containing `@AGENTS.md`
-6. Write `architecture.md` covering data flow and CI/CD wiring
-7. Optionally add the pre-commit hook to prevent accidental staging of `packages/` contents:
-   ```
-   cp hooks/pre-commit .git/hooks/pre-commit
-   chmod +x .git/hooks/pre-commit
-   ```
+1. Create the meta repo and copy `template/` into its root.
+2. List your repos in `repos.txt`. A repo only some people can access gets a gate variable, and is cloned only when it's `true`.
+3. Run `scripts/setup.sh`, or clone the repos beside the meta repo.
+4. Set `META_REPO` in `context/session-start.sh` to the meta repo's directory name, and write `context/system-map.md`.
+5. In each package, start from `package-template/`: instructions in `AGENTS.md` with the two system-map marker lines, a `CLAUDE.md` containing `@AGENTS.md`, and `.claude/settings.json`.
+6. Run `scripts/sync-context.sh`, and commit the result in each package.
+7. List each package's `CLAUDE.md` under "Instructions per package" in the meta `CLAUDE.md`, and write `architecture.md`.
+8. Enable the pre-commit hook: `git config core.hooksPath hooks`.
+
+After changing the system map or the hook, run `scripts/sync-context.sh` and commit in each package. The session-start check reports it if you forget.
 
 ## Template Files
 
 | File | Purpose |
-|------|---------|
-| `.gitignore` | Ignores `packages/` and personal Claude Code settings, so shared `.claude/` files can be committed |
-| `scripts/setup.sh` | Clones source repos into `packages/`, skipping any already there; an optional repo is gated on an environment variable |
-| `CLAUDE.md` | Starter context file — repo table, relationships, workflows, known issues, and the per-package imports |
-| `architecture.md` | Starter architecture doc — describe data flow and repo responsibilities |
-| `docs/decisions/001-example.md` | Example ADR to use as a starting point |
-| `hooks/pre-commit` | Optional hook to prevent accidentally staging files under `packages/` |
+|---|---|
+| `template/repos.txt` | The repos in the workspace: name, clone URL, optional gate variable |
+| `template/scripts/setup.sh` | Clones `repos.txt` into `packages/`, skipping any already there and any gated off |
+| `template/scripts/sync-context.sh` | Copies the system map into each package's marked block and the hook into its `.claude/hooks/`; `--check` exits 1 if anything is stale |
+| `template/scripts/check-workspace.sh` | Reports missing repos, shallow clones, missing `node_modules` (adjust for your stack) and a stale sync; always exits 0 |
+| `template/scripts/lib.sh` | Finds the meta repo and the packages, in either layout |
+| `template/context/system-map.md` | Starter system map |
+| `template/context/session-start.sh` | The packages' `SessionStart` hook: finds the meta repo beside or above the package and runs the check, or says how to get it |
+| `template/.claude/settings.json` | Runs the check when a session starts in the meta repo |
+| `template/CLAUDE.md` | Imports the system map and each package's `CLAUDE.md` |
+| `template/architecture.md` | Starter architecture doc |
+| `template/docs/decisions/001-example.md` | Example decision record |
+| `template/hooks/pre-commit` | Refuses a commit that stages anything under `packages/` |
+| `package-template/` | A package's `AGENTS.md` with the markers, its `CLAUDE.md` and `.claude/settings.json` |
 
 ## Tradeoffs
 
-- Adds an extra repo to manage — worth it only when you have 2+ source repos
-- Developers must remember to run `setup.sh` after cloning
-- Changes to `CLAUDE.md` and architecture docs require their own commit cycle
-- Importing every package's instructions puts all of them in context in every session, even one that only touches one package. Keep each package's file to what someone working in it needs.
-- Facts duplicated across repos, such as resource IDs one repo hardcodes from another, aren't kept in sync by anything. Name them in the meta `CLAUDE.md` so a change to one side prompts a change to the other.
-- IDE features may need extra config to resolve paths across `packages/` subdirectories
+- **Another repo to keep current.** Its notes describe the others, and nothing checks `architecture.md` or a runbook against the code. Stale guidance is worse than none, because an agent acts on it. Keep the meta repo to what spans repos, and everything about one repo in that repo.
+- **The system map is in every session.** It's copied into every `AGENTS.md`, so keep it to about twenty lines.
+- **A sync is a commit in every package.** Changing the system map means a commit in each repo. That's acceptable for something that changes rarely; it's why nothing else is synced.
+- **The check informs, it doesn't fix.** It can't clone a private repo without credentials it can't assume, so it says what to run instead.
+- **The hook is Claude Code's.** Other agents run the same check because the system map tells them to.
+- **The package imports in the meta `CLAUDE.md` only resolve in the inside layout.** In the beside layout, each package's guidance loads from the package itself.

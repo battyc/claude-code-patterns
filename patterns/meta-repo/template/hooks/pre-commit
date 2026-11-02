@@ -1,7 +1,6 @@
 #!/bin/bash
-# Copy this file to .git/hooks/pre-commit and make it executable:
-#   cp hooks/pre-commit .git/hooks/pre-commit
-#   chmod +x .git/hooks/pre-commit
+# Refuses a commit that stages anything under packages/. Enable it once per clone:
+#   git config core.hooksPath hooks
 
 if git diff --cached --name-only | grep -q '^packages/'; then
   echo "Error: Staged files found under packages/ — this directory is gitignored by convention."
