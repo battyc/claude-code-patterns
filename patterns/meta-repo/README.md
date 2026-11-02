@@ -27,7 +27,7 @@ The workspace has two layouts, and the scripts find either:
 | Inside | `<meta-repo>/packages/<repo>` (gitignored) | `scripts/setup.sh` |
 | Beside | `<dir>/<repo>`, next to `<dir>/<meta-repo>` | Cloning each repo into one directory, as cloud sessions do |
 
-The system map is the only thing synced. Where the repos meet in a defined interface, write it down with the [provider-owned contracts](../provider-owned-contracts/README.md) pattern: each repo keeps its own, and the others read them in place.
+Only the system map and the session-start hook are synced. Where the repos meet in a defined interface, write it down with the [provider-owned contracts](../provider-owned-contracts/README.md) pattern: each repo keeps its own, and the others read them in place.
 
 ## When to Use
 
@@ -76,7 +76,7 @@ If there's little cross-cutting to write down and sessions usually have every re
 2. List your repos in `repos.txt`. A repo only some people can access gets a gate variable, and is cloned only when it's `true`.
 3. Run `scripts/setup.sh`, or clone the repos beside the meta repo.
 4. Set `META_REPO` in `context/session-start.sh` to the meta repo's directory name, and write `context/system-map.md`.
-5. In each package, start from `package-template/`: instructions in `AGENTS.md` with the two system-map marker lines, a `CLAUDE.md` containing `@AGENTS.md`, and `.claude/settings.json`.
+5. In each package, start from `package-template/`: instructions in `AGENTS.md` with the two system-map marker lines, a `CLAUDE.md` containing `@AGENTS.md`, and `.claude/settings.json`, whose hook does nothing until the first sync puts `session-start.sh` in place.
 6. Run `scripts/sync-context.sh`, and commit the result in each package.
 7. List each package's `CLAUDE.md` under "Instructions per package" in the meta `CLAUDE.md`, and write `architecture.md`.
 8. Enable the pre-commit hook: `git config core.hooksPath hooks`.
@@ -88,7 +88,7 @@ After changing the system map or the hook, run `scripts/sync-context.sh` and com
 | File | Purpose |
 |---|---|
 | `template/repos.txt` | The repos in the workspace: name, clone URL, optional gate variable |
-| `template/scripts/setup.sh` | Clones `repos.txt` into `packages/`, skipping any already there and any gated off |
+| `template/scripts/setup.sh` | Clones `repos.txt` into `packages/`, skipping any already there, any gated off, and any directory in the way |
 | `template/scripts/sync-context.sh` | Copies the system map into each package's marked block and the hook into its `.claude/hooks/`; `--check` exits 1 if anything is stale |
 | `template/scripts/check-workspace.sh` | Reports missing repos, shallow clones, missing `node_modules` (adjust for your stack) and a stale sync; always exits 0 |
 | `template/scripts/lib.sh` | Finds the meta repo and the packages, in either layout |
@@ -105,7 +105,7 @@ After changing the system map or the hook, run `scripts/sync-context.sh` and com
 
 - **Another repo to keep current.** Its notes describe the others, and nothing checks `architecture.md` or a runbook against the code. Stale guidance is worse than none, because an agent acts on it. Keep the meta repo to what spans repos, and everything about one repo in that repo.
 - **The system map is in every session.** It's copied into every `AGENTS.md`, so keep it to about twenty lines.
-- **A sync is a commit in every package.** Changing the system map means a commit in each repo. That's acceptable for something that changes rarely; it's why nothing else is synced.
+- **A sync is a commit in every package.** Changing the system map or the hook means a commit in each repo. That's acceptable for things that change rarely; it's why nothing else is synced.
 - **The check informs, it doesn't fix.** It can't clone a private repo without credentials it can't assume, so it says what to run instead.
 - **The hook is Claude Code's.** Other agents run the same check because the system map tells them to.
 - **The package imports in the meta `CLAUDE.md` only resolve in the inside layout.** In the beside layout, each package's guidance loads from the package itself.

@@ -8,6 +8,8 @@ mkdir -p "$META_DIR/packages"
 while read -r name url gate; do
   if is_cloned "$META_DIR/packages/$name"; then
     echo "Skipping $name: already cloned"
+  elif [ -e "$META_DIR/packages/$name" ]; then
+    echo "Skipping $name: packages/$name exists but isn't a Git repo; move it aside to clone"
   elif [ -n "$gate" ] && [ "${!gate:-false}" != "true" ]; then
     echo "Skipping $name: set $gate=true to clone it"
   else
